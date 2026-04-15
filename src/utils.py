@@ -29,12 +29,21 @@ def get_logger(name: str) -> logging.Logger:
         ch = logging.StreamHandler()
         ch.setFormatter(logging.Formatter(settings.LOG_FORMAT))
         logger.addHandler(ch)
+        # Ensure directories exist before creating file handler
+        try:
+            settings.create_dirs()
+        except Exception:
+            pass
         # File handler
-        fh = logging.FileHandler(
-            Path(settings.LOG_DIR) / "pipeline.log", mode="a"
-        )
-        fh.setFormatter(logging.Formatter(settings.LOG_FORMAT))
-        logger.addHandler(fh)
+        try:
+            fh_path = Path(settings.LOG_DIR) / "pipeline.log"
+            fh_path.parent.mkdir(parents=True, exist_ok=True)
+            fh = logging.FileHandler(fh_path, mode="a")
+            fh.setFormatter(logging.Formatter(settings.LOG_FORMAT))
+            logger.addHandler(fh)
+        except Exception:
+            # If file handler cannot be created, continue with console logging
+            pass
     return logger
 
 
@@ -58,6 +67,7 @@ def timer(func):
 def save_model(model: Any, filename: str) -> Path:
     """Persist a model to disk."""
     path = Path(settings.MODEL_DIR) / filename
+    path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(model, path)
     get_logger(__name__).info(f"💾 Model saved → {path}")
     return path
@@ -87,6 +97,7 @@ def save_metrics(metrics: Dict[str, Any], filename: str) -> Path:
             clean[k] = v.tolist()
         else:
             clean[k] = v
+    path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         json.dump(clean, f, indent=2)
     get_logger(__name__).info(f"📊 Metrics saved → {path}")
@@ -96,6 +107,7 @@ def save_metrics(metrics: Dict[str, Any], filename: str) -> Path:
 def save_dataframe(df: pd.DataFrame, filename: str) -> Path:
     """Save a DataFrame to CSV."""
     path = Path(settings.OUTPUT_DIR) / filename
+    path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, index=False)
     get_logger(__name__).info(f"📄 DataFrame saved → {path} ({len(df)} rows)")
     return path

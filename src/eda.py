@@ -1,5 +1,5 @@
 """
-Exploratory Data Analysis  generates 15+ visualizations.
+Exploratory Data Analysis - generates 15+ visualizations.
 """
 
 import os
@@ -89,7 +89,7 @@ class ExploratoryAnalysis:
         sns.heatmap(top_corr, mask=mask, annot=True, fmt=".2f",
                     cmap="RdBu_r", center=0, square=True,
                     linewidths=0.5, ax=ax, vmin=-1, vmax=1)
-        ax.set_title("Top 25 Features  Correlation Matrix", fontsize=14)
+        ax.set_title("Top 25 Features - Correlation Matrix", fontsize=14)
         fig.tight_layout()
         self._save(fig, "02_correlation_heatmap")
 
@@ -300,5 +300,5 @@ class ExploratoryAnalysis:
         self.plot_skewness()
         self.plot_quality_features()
 
-        logger.info("✅ EDA complete  %d plots generated", 10)
+        logger.info("✅ EDA complete - %d plots generated", 10)
         return self.stats

@@ -1,5 +1,5 @@
 """
-Feature engineering  creates 25+ derived variables from the 79 originals,
+Feature engineering - creates 25+ derived variables from the 79 originals,
 bringing the total well above 50 usable features.
 """
 
@@ -141,7 +141,12 @@ class FeatureEngineer:
         # ── 22. Neighborhood Price Tier ─────────────────────────────
         if "Neighborhood" in df.columns and settings.TARGET_COLUMN in df.columns:
             med_prices = df.groupby("Neighborhood")[settings.TARGET_COLUMN].median()
-            tier_map = pd.qcut(med_prices, q=3, labels=[0, 1, 2]).to_dict()
+            try:
+                tier_map = pd.qcut(med_prices, q=3, labels=[0, 1, 2]).to_dict()
+            except ValueError:
+                # Fallback when there are too few unique medians: use quantile thresholds
+                q1, q2 = med_prices.quantile([0.33, 0.66]).values
+                tier_map = {k: (0 if v <= q1 else 1 if v <= q2 else 2) for k, v in med_prices.items()}
             df = self._add(df, "NeighborhoodTier",
                 df["Neighborhood"].map(tier_map).astype(float).fillna(1))
 
@@ -151,8 +156,14 @@ class FeatureEngineer:
                           3: "Spring", 4: "Spring", 5: "Spring",
                           6: "Summer", 7: "Summer", 8: "Summer",
                           9: "Fall", 10: "Fall", 11: "Fall"}
-            df = self._add(df, "SeasonSold",
-                df["MoSold"].astype(int).map(season_map).fillna("Unknown"))
+            def _map_season(v):
+                try:
+                    if pd.isna(v):
+                        return "Unknown"
+                    return season_map.get(int(v), "Unknown")
+                except Exception:
+                    return "Unknown"
+            df = self._add(df, "SeasonSold", df["MoSold"].apply(_map_season))
 
         # ── 24. Exterior Quality Score (combined) ───────────────────
         qual_num_map = {"Po": 1, "Fa": 2, "TA": 3, "Gd": 4, "Ex": 5, "None": 0}
@@ -180,7 +191,7 @@ class FeatureEngineer:
 
         # ── Finalize counts and return ───────────────────────────────
         self.final_feature_count = df.shape[1]
-        logger.info("🔧 Created %d engineered features  final feature count: %d",
-                    len(self.created_features), self.final_feature_count)
+        logger.info("🔧 Created %d engineered features - final feature count: %d",
+                len(self.created_features), self.final_feature_count)
 
         return df

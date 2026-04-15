@@ -32,11 +32,9 @@ class AmesDataLoader:
         """Download the Ames Housing dataset from OpenML."""
         logger.info("🌐 Fetching Ames Housing dataset from OpenML (ID=%d)...",
                      settings.OPENML_DATASET_ID)
-        data = fetch_openml(
-            data_id=settings.OPENML_DATASET_ID,
-            as_frame=True,
-            parser="auto",
-        )
+        # Note: avoid passing `parser` to maintain compatibility across
+        # scikit-learn versions.
+        data = fetch_openml(data_id=settings.OPENML_DATASET_ID, as_frame=True)
         df = data.frame.copy()
         self.raw_df = df.copy()
         self.original_shape = df.shape
@@ -52,6 +50,7 @@ class AmesDataLoader:
             + [settings.TARGET_COLUMN]
         )
         missing = [c for c in expected_cols if c not in df.columns]
+        self.missing_columns = missing
         if missing:
             logger.warning("⚠️  Missing columns: %s", missing)
             return False
@@ -128,7 +127,9 @@ class AmesDataLoader:
     def load(self) -> pd.DataFrame:
         """Full loading pipeline: fetch → validate → clean."""
         df = self.fetch_data()
-        self.validate_schema(df)
+        valid = self.validate_schema(df)
+        if not valid:
+            raise ValueError(f"Schema validation failed; missing columns: {getattr(self, 'missing_columns', [])}")
         df = self.initial_clean(df)
         save_dataframe(df, "cleaned_data.csv")
         return df

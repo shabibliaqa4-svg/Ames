@@ -24,7 +24,8 @@ def train_basic_models(X, y) -> Dict[str, Any]:
     models = {}
 
     # Ridge baseline
-    ridge = Ridge(random_state=settings.RANDOM_STATE)
+    # Ridge does not accept `random_state` in many sklearn versions; keep default.
+    ridge = Ridge()
     ridge.fit(X, y)
     save_model(ridge, "ridge.joblib")
     models["ridge"] = ridge

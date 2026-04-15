@@ -19,6 +19,7 @@ class Settings:
     MODEL_DIR: str = field(default="")
     PLOT_DIR: str = field(default="")
     LOG_DIR: str = field(default="")
+    dirs_created: bool = field(default=False, init=False)
 
     def __post_init__(self):
         self.DATA_DIR = os.path.join(self.PROJECT_ROOT, "data")
@@ -26,9 +27,26 @@ class Settings:
         self.MODEL_DIR = os.path.join(self.OUTPUT_DIR, "models")
         self.PLOT_DIR = os.path.join(self.OUTPUT_DIR, "plots")
         self.LOG_DIR = os.path.join(self.OUTPUT_DIR, "logs")
+        # Do not create directories at import time; allow the application
+        # to explicitly create them when ready (avoids side-effects during
+        # library import, testing, or static analysis).
+        self.dirs_created = False
+
+    def create_dirs(self) -> None:
+        """Create the standard project directories (idempotent).
+
+        Call this at application startup or from utilities that write files.
+        """
+        if self.dirs_created:
+            return
         for d in [self.DATA_DIR, self.OUTPUT_DIR, self.MODEL_DIR,
                   self.PLOT_DIR, self.LOG_DIR]:
-            os.makedirs(d, exist_ok=True)
+            try:
+                os.makedirs(d, exist_ok=True)
+            except OSError:
+                # Best-effort: do not raise during directory creation.
+                pass
+        self.dirs_created = True
 
     # ── Dataset ─────────────────────────────────────────────────────
     OPENML_DATASET_ID: int = 42165

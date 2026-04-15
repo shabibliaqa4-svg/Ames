@@ -41,9 +41,17 @@ def build_preprocessor(df: pd.DataFrame) -> ColumnTransformer:
         ("ord", OrdinalEncoder(categories=ordinal_cats, dtype=float)),
     ])
 
+    # Create OneHotEncoder in a compatibility-friendly way to support
+    # both older and newer scikit-learn versions (sparse vs sparse_output).
+    def _make_onehot():
+        try:
+            return OneHotEncoder(handle_unknown="ignore", sparse=False)
+        except TypeError:
+            return OneHotEncoder(handle_unknown="ignore", sparse_output=False)
+
     cat_pipeline = Pipeline([
         ("imputer", SimpleImputer(strategy="constant", fill_value="None")),
-        ("onehot", OneHotEncoder(handle_unknown="ignore", sparse=False)),
+        ("onehot", _make_onehot()),
     ])
 
     transformers = []
