@@ -4,6 +4,7 @@ Provides a ColumnTransformer that handles numeric, ordinal and nominal features.
 """
 
 from typing import Tuple, List
+import numpy as np
 import pandas as pd
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
@@ -21,16 +22,19 @@ def _replace_literal_none(X):
     This helps encoders and imputers treat textual 'None' values as missing.
     Returns a numpy array compatible with scikit-learn pipelines.
     """
-    import numpy as _np
-    import pandas as _pd
     try:
-        df = _pd.DataFrame(X)
-        return df.replace({"None": _np.nan, None: _np.nan, _pd.NA: _np.nan}).values
+        df = pd.DataFrame(X)
+        # Build replacement dict based on pandas version
+        repl_dict = {"None": np.nan, None: np.nan}
+        if hasattr(pd, "NA"):
+            repl_dict[pd.NA] = np.nan
+        return df.replace(repl_dict).values
     except Exception:
-        arr = _np.array(X, dtype=object)
+        # Fallback: convert to array and manually replace
+        arr = np.array(X, dtype=object)
         try:
             mask = arr == "None"
-            arr[mask] = _np.nan
+            arr[mask] = np.nan
         except Exception:
             pass
         return arr
