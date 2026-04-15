@@ -28,15 +28,18 @@ def run_pipeline():
     # Preprocessing (build transformer)
     preproc = build_preprocessor(df_fe)
 
-    # Training (quick baseline using numeric columns only)
+    # Training (apply preprocessor so all features are numeric)
     target = df_fe["SalePrice"]
     X = df_fe.drop(columns=["SalePrice"]) if "SalePrice" in df_fe.columns else df_fe
 
-    models = train_basic_models(X.fillna(0), target)
+    # Fit and transform the feature matrix using the pipeline
+    X_processed = preproc.fit_transform(X)
 
-    # Evaluate first model
+    models = train_basic_models(X_processed, target)
+
+    # Evaluate first model on the processed features
     first_model = list(models.values())[0]
-    metrics = evaluate_model(first_model, X.fillna(0), target)
+    metrics = evaluate_model(first_model, X_processed, target)
     save_metrics(metrics, "metrics.json")
     logger.info("Pipeline complete")
 

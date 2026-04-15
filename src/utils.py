@@ -18,6 +18,24 @@ from config.settings import Settings
 settings = Settings()
 
 
+# Safe stream handler that avoids UnicodeEncodeError by falling back to a
+# stream-encoding-safe representation of the message.
+class SafeStreamHandler(logging.StreamHandler):
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            msg = self.format(record)
+            stream = self.stream
+            try:
+                stream.write(msg + self.terminator)
+            except UnicodeEncodeError:
+                enc = getattr(stream, "encoding", None) or "utf-8"
+                safe = (msg + self.terminator).encode(enc, errors="replace").decode(enc, errors="replace")
+                stream.write(safe)
+            self.flush()
+        except Exception:
+            self.handleError(record)
+
+
 # ── Logging ─────────────────────────────────────────────────────────────────
 
 def get_logger(name: str) -> logging.Logger:
@@ -25,8 +43,8 @@ def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     if not logger.handlers:
         logger.setLevel(getattr(logging, settings.LOG_LEVEL))
-        # Console handler
-        ch = logging.StreamHandler()
+        # Console handler (safe against UnicodeEncodeError)
+        ch = SafeStreamHandler()
         ch.setFormatter(logging.Formatter(settings.LOG_FORMAT))
         logger.addHandler(ch)
         # Ensure directories exist before creating file handler
@@ -38,7 +56,7 @@ def get_logger(name: str) -> logging.Logger:
         try:
             fh_path = Path(settings.LOG_DIR) / "pipeline.log"
             fh_path.parent.mkdir(parents=True, exist_ok=True)
-            fh = logging.FileHandler(fh_path, mode="a")
+            fh = logging.FileHandler(fh_path, mode="a", encoding="utf-8")
             fh.setFormatter(logging.Formatter(settings.LOG_FORMAT))
             logger.addHandler(fh)
         except Exception:

@@ -20,7 +20,7 @@ env/
 
 # Data & outputs
 data/*.csv
-outputs/
+
 models/*.joblib
 models/*.pkl
 *.log

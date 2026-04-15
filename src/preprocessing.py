@@ -7,12 +7,33 @@ from typing import Tuple, List
 import pandas as pd
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler, FunctionTransformer
 from sklearn.compose import ColumnTransformer
 
 from config.settings import Settings
 
 settings = Settings()
+
+
+def _replace_literal_none(X):
+    """Replace literal 'None' strings (and Python None / pd.NA) with np.nan.
+
+    This helps encoders and imputers treat textual 'None' values as missing.
+    Returns a numpy array compatible with scikit-learn pipelines.
+    """
+    import numpy as _np
+    import pandas as _pd
+    try:
+        df = _pd.DataFrame(X)
+        return df.replace({"None": _np.nan, None: _np.nan, _pd.NA: _np.nan}).values
+    except Exception:
+        arr = _np.array(X, dtype=object)
+        try:
+            mask = arr == "None"
+            arr[mask] = _np.nan
+        except Exception:
+            pass
+        return arr
 
 
 def build_preprocessor(df: pd.DataFrame) -> ColumnTransformer:
@@ -37,7 +58,9 @@ def build_preprocessor(df: pd.DataFrame) -> ColumnTransformer:
     ])
 
     ord_pipeline = Pipeline([
-        ("imputer", SimpleImputer(strategy="constant", fill_value="None")),
+        # Normalize literal 'None' then impute missing ordinals to 'NA'
+        ("fix_none", FunctionTransformer(_replace_literal_none, validate=False)),
+        ("imputer", SimpleImputer(strategy="constant", fill_value="NA")),
         ("ord", OrdinalEncoder(categories=ordinal_cats, dtype=float)),
     ])
 
@@ -50,6 +73,8 @@ def build_preprocessor(df: pd.DataFrame) -> ColumnTransformer:
             return OneHotEncoder(handle_unknown="ignore", sparse_output=False)
 
     cat_pipeline = Pipeline([
+        # Normalize literal 'None' to np.nan so imputers behave consistently
+        ("fix_none", FunctionTransformer(_replace_literal_none, validate=False)),
         ("imputer", SimpleImputer(strategy="constant", fill_value="None")),
         ("onehot", _make_onehot()),
     ])

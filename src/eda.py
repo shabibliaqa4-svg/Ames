@@ -138,25 +138,80 @@ class ExploratoryAnalysis:
     # ── 4. Categorical feature boxplots ─────────────────────────────
     def plot_categorical_boxplots(self, n: int = 9):
         cat_cols = self.categorical_df.columns.tolist()
-        # Select those with reasonable cardinality
-        selected = [c for c in cat_cols if self.df[c].nunique() <= 15][:n]
+        # Skip trivial or constant columns
+        cat_cols = [c for c in cat_cols if self.df[c].nunique() > 1]
+        if not cat_cols:
+            logger.info("No categorical features available for boxplots.")
+            return
+
+        # Choose up to `n` categorical columns to visualize
+        selected = cat_cols[:n]
+
+        # Tunable limits (can be overridden in Settings if added)
+        MAX_CATEGORIES = getattr(settings, "MAX_CATEGORIES_TO_PLOT", 10)
+        MAX_SAMPLE = getattr(settings, "PLOT_SAMPLE_SIZE", 5000)
 
         ncols = 3
         nrows = (len(selected) + ncols - 1) // ncols
+        if nrows < 1:
+            nrows = 1
         fig, axes = plt.subplots(nrows, ncols, figsize=(18, 5 * nrows))
         axes = axes.flatten()
 
+        last_i = -1
         for i, col in enumerate(selected):
-            order = (
-                self.df.groupby(col)[self.target].median()
-                .sort_values().index
-            )
-            sns.boxplot(data=self.df, x=col, y=self.target,
-                        order=order, ax=axes[i], palette="Set2")
-            axes[i].set_title(f"{col} vs {self.target}", fontsize=11)
-            axes[i].tick_params(axis="x", rotation=45)
+            last_i = i
+            # Use only the two relevant columns to reduce overhead
+            df_plot = self.df[[col, self.target]].dropna()
 
-        for j in range(i + 1, len(axes)):
+            if df_plot.empty:
+                axes[i].text(0.5, 0.5, "No data", ha="center")
+                axes[i].set_title(f"{col} vs {self.target}", fontsize=11)
+                axes[i].tick_params(axis="x", rotation=45)
+                continue
+
+            # If the column has many small-frequency categories, keep only top-K
+            vc = df_plot[col].value_counts()
+            if vc.size > MAX_CATEGORIES:
+                top_cats = vc.index[:MAX_CATEGORIES]
+                df_plot = df_plot[df_plot[col].isin(top_cats)]
+                logger.info("Limiting %s to top %d categories for plotting", col, MAX_CATEGORIES)
+                if df_plot.empty:
+                    axes[i].text(0.5, 0.5, "Not enough data after limiting categories", ha="center")
+                    axes[i].set_title(f"{col} vs {self.target}", fontsize=11)
+                    axes[i].tick_params(axis="x", rotation=45)
+                    continue
+
+            # Sample the data to avoid huge plots and memory spikes
+            if len(df_plot) > MAX_SAMPLE:
+                try:
+                    df_plot = df_plot.sample(n=MAX_SAMPLE, random_state=settings.RANDOM_STATE)
+                except Exception:
+                    df_plot = df_plot.sample(n=MAX_SAMPLE, random_state=42)
+
+            # Compute ordering by median target within the (possibly filtered) data
+            try:
+                order = (
+                    df_plot.groupby(col)[self.target].median()
+                    .sort_values().index.tolist()
+                )
+            except Exception:
+                order = df_plot[col].unique().tolist()
+
+            # Attempt to plot; catch and log errors to prevent entire EDA from hanging
+            try:
+                sns.boxplot(data=df_plot, x=col, y=self.target,
+                            order=order, ax=axes[i], palette="Set2")
+            except Exception as e:
+                logger.warning("Failed to plot boxplot for %s: %s", col, e)
+                axes[i].clear()
+                axes[i].text(0.5, 0.5, "Plot failed", ha="center")
+            finally:
+                axes[i].set_title(f"{col} vs {self.target}", fontsize=11)
+                axes[i].tick_params(axis="x", rotation=45)
+
+        # Hide any remaining empty subplots
+        for j in range(last_i + 1, len(axes)):
             axes[j].set_visible(False)
 
         fig.suptitle("Categorical Features vs Sale Price", fontsize=16, y=1.01)

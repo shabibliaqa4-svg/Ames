@@ -68,15 +68,17 @@ class Settings:
     ])
 
     ORDINAL_FEATURES: Dict[str, List[str]] = field(default_factory=lambda: {
-        "ExterQual":    ["Po", "Fa", "TA", "Gd", "Ex"],
-        "ExterCond":    ["Po", "Fa", "TA", "Gd", "Ex"],
+        # Include an explicit 'NA' category so imputing missing values
+        # to 'NA' won't introduce unknown categories at encoding time.
+        "ExterQual":    ["NA", "Po", "Fa", "TA", "Gd", "Ex"],
+        "ExterCond":    ["NA", "Po", "Fa", "TA", "Gd", "Ex"],
         "BsmtQual":     ["NA", "Po", "Fa", "TA", "Gd", "Ex"],
         "BsmtCond":     ["NA", "Po", "Fa", "TA", "Gd", "Ex"],
         "BsmtExposure": ["NA", "No", "Mn", "Av", "Gd"],
         "BsmtFinType1": ["NA", "Unf", "LwQ", "Rec", "BLQ", "ALQ", "GLQ"],
         "BsmtFinType2": ["NA", "Unf", "LwQ", "Rec", "BLQ", "ALQ", "GLQ"],
-        "HeatingQC":    ["Po", "Fa", "TA", "Gd", "Ex"],
-        "KitchenQual":  ["Po", "Fa", "TA", "Gd", "Ex"],
+        "HeatingQC":    ["NA", "Po", "Fa", "TA", "Gd", "Ex"],
+        "KitchenQual":  ["NA", "Po", "Fa", "TA", "Gd", "Ex"],
         "FireplaceQu":  ["NA", "Po", "Fa", "TA", "Gd", "Ex"],
         "GarageFinish": ["NA", "Unf", "RFn", "Fin"],
         "GarageQual":   ["NA", "Po", "Fa", "TA", "Gd", "Ex"],
